@@ -3,8 +3,6 @@ import { devtools, persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import type { ViewingHistoryItem } from '@/types'
 import { useSettingStore } from './settingStore'
-import { useUpstashStore } from './upstashStore'
-import { isUpstashConfigured } from '@/services/upstash.service'
 
 interface ViewingHistoryState {
   // 观看历史列表
@@ -25,7 +23,7 @@ type ViewingHistoryStore = ViewingHistoryState & ViewingHistoryActions
 export const useViewingHistoryStore = create<ViewingHistoryStore>()(
   devtools(
     persist(
-      immer<ViewingHistoryStore>((set, get) => ({
+      immer<ViewingHistoryStore>(set => ({
         // 初始状态
         viewingHistory: [],
 
@@ -65,11 +63,6 @@ export const useViewingHistoryStore = create<ViewingHistoryStore>()(
               state.viewingHistory.splice(50)
             }
           })
-          // 同步到 Upstash
-          const upstashStore = useUpstashStore.getState()
-          if (isUpstashConfigured() && upstashStore.isEnabled) {
-            upstashStore.saveViewingHistory(get().viewingHistory)
-          }
         },
 
         removeViewingHistory: (item: ViewingHistoryItem) => {
@@ -79,22 +72,12 @@ export const useViewingHistoryStore = create<ViewingHistoryStore>()(
                 historyItem.sourceCode !== item.sourceCode || historyItem.vodId !== item.vodId,
             )
           })
-          // 同步到 Upstash
-          const upstashStore = useUpstashStore.getState()
-          if (isUpstashConfigured() && upstashStore.isEnabled) {
-            upstashStore.saveViewingHistory(get().viewingHistory)
-          }
         },
 
         clearViewingHistory: () => {
           set(state => {
             state.viewingHistory = []
           })
-          // 同步到 Upstash
-          const upstashStore = useUpstashStore.getState()
-          if (isUpstashConfigured() && upstashStore.isEnabled) {
-            upstashStore.saveViewingHistory(get().viewingHistory)
-          }
         },
       })),
       {

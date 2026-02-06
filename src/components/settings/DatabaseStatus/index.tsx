@@ -1,8 +1,4 @@
 import { useEffect, useState } from 'react'
-import { useUpstashStore } from '@/store/upstashStore'
-import { isUpstashConfigured } from '@/services/upstash.service'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import {
   Database,
@@ -13,83 +9,123 @@ import {
   CloudOff,
   AlertCircle,
   Loader2,
+  Activity,
+  Clock,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import DatabaseTest from './DatabaseTest'
+import {
+  isUpstashConfigured,
+  checkDatabaseConnection,
+} from '@/services/db.service'
+import { getCloudSync, initializeCloudSync } from '@/store/cloudSync'
 
 export default function DatabaseStatus() {
-  const {
-    isConnected,
-    isChecking,
-    isSyncing,
-    isEnabled,
-    lastCheckedAt,
-    lastSyncedAt,
-    checkConnection,
-    setEnabled,
-    syncFromCloud,
-    syncToCloud,
-    initialize,
-  } = useUpstashStore()
-
   const [isConfigured, setIsConfigured] = useState(false)
+  const [isConnected, setIsConnected] = useState(false)
+  const [isChecking, setIsChecking] = useState(false)
+  const [isEnabled, setIsEnabled] = useState(false)
+  const [lastCheckedAt, setLastCheckedAt] = useState<number | null>(null)
+  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null)
+  const [isInitialized, setIsInitialized] = useState(false)
 
   useEffect(() => {
     setIsConfigured(isUpstashConfigured())
-    initialize()
-  }, [initialize])
+    if (isUpstashConfigured()) {
+      initializeCloudSync().then(success => {
+        console.log('[DatabaseStatus] CloudSync 初始化结果:', success)
+        setIsInitialized(success)
+        if (success) {
+          updateStatus()
+          checkConnection()
+          startMonitoring()
+        }
+      })
+    }
+  }, [])
+
+  const updateStatus = () => {
+    const sync = getCloudSync()
+    const status = sync.getStatus()
+    console.log('[DatabaseStatus] CloudSync 状态:', status)
+    setIsEnabled(status.isEnabled)
+    setIsConnected(status.isConnected)
+    setLastSyncedAt(Date.now())
+  }
+
+  const startMonitoring = () => {
+    setInterval(() => {
+      checkConnection()
+      if (isInitialized) {
+        updateStatus()
+      }
+    }, 30000)
+  }
+
+  const checkConnection = async () => {
+    if (!isUpstashConfigured()) {
+      setIsConnected(false)
+      setIsEnabled(false)
+      return
+    }
+
+    setIsChecking(true)
+    try {
+      const connected = await checkDatabaseConnection()
+      setIsConnected(connected)
+      setLastCheckedAt(Date.now())
+
+      if (connected && isInitialized) {
+        updateStatus()
+      }
+    } catch (error) {
+      console.error('检查连接失败:', error)
+      setIsConnected(false)
+    } finally {
+      setIsChecking(false)
+    }
+  }
 
   const handleCheckConnection = async () => {
-    const connected = await checkConnection()
-    if (connected) {
+    await checkConnection()
+    if (isConnected) {
       toast.success('数据库连接成功')
     } else {
       toast.error('数据库连接失败，请检查配置')
     }
   }
 
-  const handleSyncFromCloud = async () => {
-    const data = await syncFromCloud()
-    if (data) {
-      toast.success('已从云端同步数据')
-    } else {
-      toast.error('同步失败，请检查连接状态')
-    }
-  }
-
-  const handleSyncToCloud = async () => {
-    // 获取当前所有 store 的数据
-    const { useApiStore } = await import('@/store/apiStore')
-    const { useViewingHistoryStore } = await import('@/store/viewingHistoryStore')
-    const { useSearchStore } = await import('@/store/searchStore')
-    const { useSettingStore } = await import('@/store/settingStore')
-
-    const success = await syncToCloud({
-      videoSources: useApiStore.getState().videoAPIs,
-      viewingHistory: useViewingHistoryStore.getState().viewingHistory,
-      searchHistory: useSearchStore.getState().searchHistory,
-      settings: {
-        network: useSettingStore.getState().network,
-        search: useSettingStore.getState().search,
-        playback: useSettingStore.getState().playback,
-        system: useSettingStore.getState().system,
-      },
-      searchCache: useSearchStore.getState().searchResultsCache,
-    })
-
-    if (success) {
-      toast.success('已同步到云端')
-    } else {
-      toast.error('同步失败，请检查连接状态')
-    }
-  }
-
   const formatTime = (timestamp: number | null) => {
     if (!timestamp) return '从未'
+    const now = Date.now()
+    const diff = now - timestamp
+    const seconds = Math.floor(diff / 1000)
+    const minutes = Math.floor(seconds / 60)
+    const hours = Math.floor(minutes / 60)
+
+    if (seconds < 60) return `${seconds} 秒前`
+    if (minutes < 60) return `${minutes} 分钟前`
+    if (hours < 24) return `${hours} 小时前`
     return new Date(timestamp).toLocaleString('zh-CN')
   }
 
-  // 如果没有配置 Upstash
+  const getConnectionStatusColor = () => {
+    if (isChecking) return 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400'
+    if (isConnected) return 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
+    return 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+  }
+
+  const getConnectionStatusText = () => {
+    if (isChecking) return '正在检查...'
+    if (isConnected) return '已连接'
+    return '未连接'
+  }
+
+  const getConnectionStatusIcon = () => {
+    if (isChecking) return <Loader2 className="h-6 w-6 animate-spin" />
+    if (isConnected) return <Cloud className="h-6 w-6" />
+    return <CloudOff className="h-6 w-6" />
+  }
+
   if (!isConfigured) {
     return (
       <div className="flex flex-col gap-6 px-4 md:px-8">
@@ -127,57 +163,69 @@ export default function DatabaseStatus() {
         <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">数据库状态</h2>
       </div>
 
-      {/* 连接状态面板 */}
+      {/* 实时连接状态 */}
       <div className="rounded-lg border border-gray-200 bg-white/40 p-6 dark:border-gray-700 dark:bg-gray-800/40">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div
-              className={`flex h-12 w-12 items-center justify-center rounded-full ${
-                isConnected
-                  ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
-                  : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-              }`}
-            >
-              {isConnected ? <Cloud className="h-6 w-6" /> : <CloudOff className="h-6 w-6" />}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className={`flex h-12 w-12 items-center justify-center rounded-full ${getConnectionStatusColor()}`}>
+                {getConnectionStatusIcon()}
+              </div>
+              <div>
+                <h3 className="font-medium text-gray-800 dark:text-gray-100">
+                  {getConnectionStatusText()}
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {isChecking ? '正在检查连接...' : `上次检查: ${formatTime(lastCheckedAt)}`}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-medium text-gray-800 dark:text-gray-100">
-                {isConnected ? '已连接 Upstash 数据库' : '未连接 Upstash 数据库'}
-              </h3>
-              <p className="text-sm text-gray-500">
-                {isChecking
-                  ? '正在检查连接...'
-                  : `上次检查: ${formatTime(lastCheckedAt)}`}
-              </p>
+            <div className="flex items-center gap-2">
+              {isConnected ? (
+                <CheckCircle2 className="h-6 w-6 text-green-500" />
+              ) : (
+                <XCircle className="h-6 w-6 text-red-500" />
+              )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {isConnected ? (
-              <CheckCircle2 className="h-6 w-6 text-green-500" />
-            ) : (
-              <XCircle className="h-6 w-6 text-red-500" />
-            )}
-          </div>
-        </div>
-      </div>
 
-      {/* 数据库开关 */}
-      <div className="flex flex-row items-center justify-between rounded-lg border border-gray-200 bg-white/40 p-4 transition-all hover:border-gray-300 hover:bg-white/60 hover:shadow-sm dark:border-gray-700 dark:bg-gray-800/40 dark:hover:bg-gray-800/60">
-        <div className="space-y-0.5">
-          <Label className="text-base text-gray-800 dark:text-gray-100">启用云端同步</Label>
-          <p className="text-sm text-gray-500">
-            开启后，数据将自动同步到 Upstash 云端数据库
-          </p>
+          {/* 详细状态信息 */}
+          <div className="grid gap-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <Activity className="h-4 w-4" />
+                <span>同步状态</span>
+              </div>
+              <span className={`text-sm font-medium ${isEnabled ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}`}>
+                {isEnabled ? '已启用' : '未启用'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <Clock className="h-4 w-4" />
+                <span>上次同步</span>
+              </div>
+              <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                {formatTime(lastSyncedAt)}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <Database className="h-4 w-4" />
+                <span>数据库配置</span>
+              </div>
+              <span className="text-sm font-medium text-green-600 dark:text-green-400">
+                已配置
+              </span>
+            </div>
+          </div>
         </div>
-        <Switch
-          checked={isEnabled}
-          onCheckedChange={setEnabled}
-          disabled={!isConnected}
-        />
       </div>
 
       {/* 操作按钮 */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <Button
           variant="outline"
           onClick={handleCheckConnection}
@@ -194,44 +242,17 @@ export default function DatabaseStatus() {
 
         <Button
           variant="outline"
-          onClick={handleSyncFromCloud}
-          disabled={!isConnected || !isEnabled || isSyncing}
+          onClick={() => {
+            const sync = getCloudSync()
+            sync.pushToCloud()
+          }}
+          disabled={!isConnected || !isEnabled}
           className="flex items-center gap-2"
         >
-          {isSyncing ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Cloud className="h-4 w-4" />
-          )}
-          从云端同步
-        </Button>
-
-        <Button
-          variant="outline"
-          onClick={handleSyncToCloud}
-          disabled={!isConnected || !isEnabled || isSyncing}
-          className="flex items-center gap-2"
-        >
-          {isSyncing ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Database className="h-4 w-4" />
-          )}
-          同步到云端
+          <Database className="h-4 w-4" />
+          手动同步
         </Button>
       </div>
-
-      {/* 同步状态 */}
-      {lastSyncedAt && (
-        <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-4 dark:border-gray-700 dark:bg-gray-800/30">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            上次同步时间: {formatTime(lastSyncedAt)}
-          </p>
-        </div>
-      )}
-
-      {/* 数据库功能测试 */}
-      <DatabaseTest />
 
       {/* 说明信息 */}
       <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
@@ -240,7 +261,8 @@ export default function DatabaseStatus() {
           <div className="space-y-1">
             <h4 className="font-medium text-blue-800 dark:text-blue-200">数据同步说明</h4>
             <ul className="ml-4 list-disc text-sm text-blue-700 dark:text-blue-300">
-              <li>视频源列表、观看历史、搜索历史等数据会同步到云端</li>
+              <li>连接状态每 30 秒自动更新一次</li>
+              <li>视频源列表、观看历史、搜索历史等数据会自动同步到云端</li>
               <li>即使更换设备或清除浏览器数据，也能恢复您的个人配置</li>
               <li>数据存储在 Upstash Redis 中，安全可靠</li>
             </ul>

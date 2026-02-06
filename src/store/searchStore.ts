@@ -3,8 +3,6 @@ import { devtools, persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import type { SearchHistory, SearchHistoryItem, VideoItem } from '@/types'
 import { v4 as uuidv4 } from 'uuid'
-import { useUpstashStore } from './upstashStore'
-import { isUpstashConfigured } from '@/services/upstash.service'
 
 // 搜索结果缓存最大数量
 // 搜索结果缓存最大数量
@@ -115,11 +113,6 @@ export const useSearchStore = create<SearchStore>()(
               (a: SearchHistoryItem, b: SearchHistoryItem) => b.updatedAt - a.updatedAt,
             )
           })
-          // 同步到 Upstash
-          const upstashStore = useUpstashStore.getState()
-          if (isUpstashConfigured() && upstashStore.isEnabled) {
-            upstashStore.saveSearchHistory(get().searchHistory)
-          }
         },
 
         removeSearchHistoryItem: (id: string) => {
@@ -128,22 +121,12 @@ export const useSearchStore = create<SearchStore>()(
               (item: SearchHistoryItem) => item.id !== id,
             )
           })
-          // 同步到 Upstash
-          const upstashStore = useUpstashStore.getState()
-          if (isUpstashConfigured() && upstashStore.isEnabled) {
-            upstashStore.saveSearchHistory(get().searchHistory)
-          }
         },
 
         clearSearchHistory: () => {
           set(state => {
             state.searchHistory = []
           })
-          // 同步到 Upstash
-          const upstashStore = useUpstashStore.getState()
-          if (isUpstashConfigured() && upstashStore.isEnabled) {
-            upstashStore.saveSearchHistory(get().searchHistory)
-          }
         },
 
         removeSearchResultsCacheItem: (query: string) => {

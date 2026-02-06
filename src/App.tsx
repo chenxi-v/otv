@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useSearchHistory, useSearch } from '@/hooks'
 
 import { useSettingStore } from '@/store/settingStore'
-import { useUpstashStore } from '@/store/upstashStore'
+import { initializeCloudSync } from '@/store/cloudSync'
 
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
@@ -27,7 +27,6 @@ function App() {
 
   const { hasNewVersion, setShowUpdateModal } = useVersionStore()
   const { system } = useSettingStore()
-  const { initialize: initializeUpstash } = useUpstashStore()
 
   const [buttonTransitionStatus, setButtonTransitionStatus] = useState({
     opacity: 0,
@@ -60,10 +59,55 @@ function App() {
     }
   }, [hasNewVersion, setShowUpdateModal, system.isUpdateLogEnabled])
 
-  // 初始化 Upstash
+  // 初始化云端同步
   useEffect(() => {
-    initializeUpstash()
-  }, [initializeUpstash])
+    console.log('[App] 初始化云端同步...')
+    initializeCloudSync()
+  }, [])
+
+  // 测试 Upstash 连接
+  const testUpstashConnection = async () => {
+    const UPSTASH_REDIS_REST_URL = import.meta.env.VITE_UPSTASH_REDIS_REST_URL
+    const UPSTASH_REDIS_REST_TOKEN = import.meta.env.VITE_UPSTASH_REDIS_REST_TOKEN
+
+    console.log('[Test] 环境变量:', {
+      hasUrl: !!UPSTASH_REDIS_REST_URL,
+      hasToken: !!UPSTASH_REDIS_REST_TOKEN,
+      url: UPSTASH_REDIS_REST_URL,
+      token: UPSTASH_REDIS_REST_TOKEN,
+    })
+
+    try {
+      const { Redis } = await import('@upstash/redis')
+      console.log('[Test] 创建 Redis 客户端...')
+      const redis = new Redis({
+        url: UPSTASH_REDIS_REST_URL,
+        token: UPSTASH_REDIS_REST_TOKEN,
+      })
+
+      console.log('[Test] 发送 PING 命令...')
+      const result = await redis.ping()
+      console.log('[Test] PING 结果:', result)
+
+      if (result === 'PONG') {
+        console.log('[Test] 连接成功！')
+        alert('Upstash 连接成功！')
+      } else {
+        console.error('[Test] PING 返回值不正确:', result)
+        alert('PING 返回值不正确: ' + result)
+      }
+    } catch (error) {
+      console.error('[Test] 连接失败:', error)
+      if (error instanceof Error) {
+        console.error('[Test] 错误详情:', {
+          message: error.message,
+          name: error.name,
+          stack: error.stack,
+        })
+        alert('连接失败: ' + error.message)
+      }
+    }
+  }
 
   const handleSearch = () => {
     searchMovie(search)
@@ -89,6 +133,14 @@ function App() {
         <motion.div layoutId="history-icon" className="absolute top-5 right-5 z-50 flex gap-4">
           <Button isIconOnly className="bg-white/20 shadow-lg shadow-gray-500/10 backdrop-blur-2xl">
             <RecentHistory />
+          </Button>
+          <Button
+            onPress={testUpstashConnection}
+            isIconOnly
+            className="bg-blue-500/20 shadow-lg shadow-blue-500/10 backdrop-blur-2xl"
+            title="测试数据库连接"
+          >
+            <span className="text-lg">🔌</span>
           </Button>
           <Button
             onPress={() => {

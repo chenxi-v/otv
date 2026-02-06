@@ -5,8 +5,6 @@ import type { VideoApi } from '@/types'
 import { getInitialVideoSources } from '@/config/api.config'
 import { v4 as uuidv4 } from 'uuid'
 import { useSettingStore } from './settingStore'
-import { useUpstashStore } from './upstashStore'
-import { isUpstashConfigured } from '@/services/upstash.service'
 
 interface ApiState {
   // 自定义 API 列表
@@ -57,22 +55,12 @@ export const useApiStore = create<ApiStore>()(
               state.videoAPIs.push({ ...api, updatedAt: new Date() })
             }
           })
-          // 同步到 Upstash
-          const upstashStore = useUpstashStore.getState()
-          if (isUpstashConfigured() && upstashStore.isEnabled) {
-            upstashStore.saveVideoSources(get().videoAPIs)
-          }
         },
 
         removeVideoAPI: (apiId: string) => {
           set(state => {
             state.videoAPIs = state.videoAPIs.filter(api => api.id !== apiId)
           })
-          // 同步到 Upstash
-          const upstashStore = useUpstashStore.getState()
-          if (isUpstashConfigured() && upstashStore.isEnabled) {
-            upstashStore.saveVideoSources(get().videoAPIs)
-          }
         },
 
         setAdFilteringEnabled: (enabled: boolean) => {
@@ -88,33 +76,18 @@ export const useApiStore = create<ApiStore>()(
               api.isEnabled = enabled
             }
           })
-          // 同步到 Upstash
-          const upstashStore = useUpstashStore.getState()
-          if (isUpstashConfigured() && upstashStore.isEnabled) {
-            upstashStore.saveVideoSources(get().videoAPIs)
-          }
         },
 
         selectAllAPIs: () => {
           set(state => {
             state.videoAPIs = state.videoAPIs.map(api => ({ ...api, isEnabled: true }))
           })
-          // 同步到 Upstash
-          const upstashStore = useUpstashStore.getState()
-          if (isUpstashConfigured() && upstashStore.isEnabled) {
-            upstashStore.saveVideoSources(get().videoAPIs)
-          }
         },
 
         deselectAllAPIs: () => {
           set(state => {
             state.videoAPIs = state.videoAPIs.map(api => ({ ...api, isEnabled: false }))
           })
-          // 同步到 Upstash
-          const upstashStore = useUpstashStore.getState()
-          if (isUpstashConfigured() && upstashStore.isEnabled) {
-            upstashStore.saveVideoSources(get().videoAPIs)
-          }
         },
 
         initializeEnvSources: async () => {
@@ -163,11 +136,6 @@ export const useApiStore = create<ApiStore>()(
               }
             })
           })
-          // 同步到 Upstash
-          const upstashStore = useUpstashStore.getState()
-          if (isUpstashConfigured() && upstashStore.isEnabled) {
-            upstashStore.saveVideoSources(get().videoAPIs)
-          }
         },
 
         getSelectedAPIs: () => {
@@ -179,11 +147,6 @@ export const useApiStore = create<ApiStore>()(
             state.videoAPIs = []
           })
           await get().initializeEnvSources()
-          // 同步到 Upstash
-          const upstashStore = useUpstashStore.getState()
-          if (isUpstashConfigured() && upstashStore.isEnabled) {
-            upstashStore.saveVideoSources(get().videoAPIs)
-          }
         },
       })),
       {
