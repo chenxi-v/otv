@@ -31,7 +31,7 @@ export default function Layout() {
       </Suspense>
       <ScrollArea className="h-dvh">
         <Navigation />
-        <div className="mx-auto max-w-300">
+        <div className="mx-auto max-w-300 pb-24 md:pb-8">
           <Outlet />
         </div>
       </ScrollArea>

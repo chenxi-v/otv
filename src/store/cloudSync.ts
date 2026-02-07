@@ -21,21 +21,33 @@ import type { SearchHistoryItem } from '@/types'
 
 // 生成用户 ID
 const generateUserId = (): string => {
-  const accessPassword = import.meta.env.VITE_ACCESS_PASSWORD
-  if (accessPassword) {
+  const username = import.meta.env.VITE_USERNAME || ''
+  const accessPassword = import.meta.env.VITE_ACCESS_PASSWORD || ''
+
+  // 如果有用户名或访问密码，生成固定的用户 ID
+  if (username || accessPassword) {
+    const combinedString = `${username}:${accessPassword}`
     let hash = 0
-    for (let i = 0; i < accessPassword.length; i++) {
-      const char = accessPassword.charCodeAt(i)
+    for (let i = 0; i < combinedString.length; i++) {
+      const char = combinedString.charCodeAt(i)
       hash = (hash << 5) - hash + char
       hash = hash & hash
     }
-    return `user_${Math.abs(hash).toString(16)}`
+    const userId = `user_${Math.abs(hash).toString(16)}`
+    console.log('[CloudSync] 基于用户名和密码生成用户 ID:', {
+      username,
+      hasPassword: !!accessPassword,
+      userId,
+    })
+    return userId
   }
 
+  // 否则使用随机生成的用户 ID
   let userId = localStorage.getItem('ouonnki-tv-user-id')
   if (!userId) {
     userId = `user_${Math.random().toString(36).substring(2, 15)}`
     localStorage.setItem('ouonnki-tv-user-id', userId)
+    console.log('[CloudSync] 生成随机用户 ID:', userId)
   }
   return userId
 }
@@ -86,7 +98,12 @@ class CloudSync {
     // 启动监听
     this.startListening()
 
-    toast.success('已连接到云端数据库')
+    // 只在首次连接时显示提示
+    const hasShownConnectionToast = localStorage.getItem('ouonnki-tv-connection-toast-shown')
+    if (!hasShownConnectionToast) {
+      toast.success('已连接到云端数据库')
+      localStorage.setItem('ouonnki-tv-connection-toast-shown', 'true')
+    }
     return true
   }
 

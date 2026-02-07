@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router'
+import { useParams, useNavigate, NavLink } from 'react-router'
 import { apiService } from '@/services/api.service'
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { type VideoItem } from '@/types'
@@ -13,10 +13,14 @@ import {
   addToast,
   Pagination,
   Skeleton,
+  Input,
+  Button,
 } from '@heroui/react'
-import { NoResultIcon } from '@/components/icons'
+import { NoResultIcon, OkiLogo, SearchIcon } from '@/components/icons'
 import { PaginationConfig } from '@/config/video.config'
 import { useDocumentTitle } from '@/hooks'
+
+import { motion } from 'framer-motion'
 
 export default function SearchResult() {
   const abortCtrlRef = useRef<AbortController | null>(null)
@@ -46,6 +50,15 @@ export default function SearchResult() {
   const selectedAPIs = useMemo(() => {
     return videoAPIs.filter(api => api.isEnabled)
   }, [videoAPIs])
+  // 搜索输入
+  const [search, setSearch] = useState(query || '')
+  // 搜索按钮禁用状态
+  const [buttonIsDisabled, setButtonIsDisabled] = useState(true)
+  // 搜索按钮过渡状态
+  const [buttonTransitionStatus, setButtonTransitionStatus] = useState({
+    opacity: 0,
+    filter: 'blur(5px)',
+  })
 
   // 调用搜索内容
   const fetchSearchRes = useCallback(
@@ -235,6 +248,42 @@ export default function SearchResult() {
     }
   }, [paginationRes.length, curPage])
 
+  // 监听搜索输入变化
+  useEffect(() => {
+    if (search.trim().length > 0) {
+      setButtonIsDisabled(false)
+      setButtonTransitionStatus({
+        opacity: 1,
+        filter: 'blur(0px)',
+      })
+    } else {
+      setButtonIsDisabled(true)
+      setButtonTransitionStatus({
+        opacity: 0,
+        filter: 'blur(5px)',
+      })
+    }
+  }, [search])
+
+  // 处理搜索按钮点击
+  const handleSearch = () => {
+    if (search.trim().length > 0) {
+      // 添加到搜索历史
+
+      // 跳转到搜索结果页面
+      navigate(`/search/${encodeURIComponent(search.trim())}`)
+    }
+  }
+
+  // 处理回车键搜索
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !buttonIsDisabled) {
+      handleSearch()
+    }
+  }
+
+
+
   const paginationTheme = invertPagination
     ? {
         base: 'bg-transparent transition-all',
@@ -262,58 +311,145 @@ export default function SearchResult() {
   }
 
   return (
-    <div className="p-4">
+    <div className="container mx-auto px-4 py-8 pb-24 md:pb-8">
+      <motion.div
+        layoutId="app-logo"
+        transition={{ duration: 0.4 }}
+        className="flex items-center justify-center gap-2 text-[1.5rem] md:text-[2rem] mb-8"
+      >
+        <motion.div layoutId="logo-icon">
+          <div className="block md:hidden">
+            <OkiLogo size={48} />
+          </div>
+          <div className="hidden md:block">
+            <OkiLogo size={64} />
+          </div>
+        </motion.div>
+        <motion.p layoutId="logo-text" className="font-bold text-inherit">
+          OUONNKI TV
+        </motion.p>
+      </motion.div>
+      <div className="flex justify-end mb-4">
+        <Button
+          variant="ghost"
+          className="mb-4"
+          onClick={() => navigate('/')}
+        >
+          返回首页
+        </Button>
+      </div>
+      <div className="flex justify-center mb-8">
+        <motion.div
+          layoutId="search-container"
+          initial={{ width: 'min(30rem, 90vw)' }}
+          whileHover={{
+            scale: 1.03,
+            width: 'min(30rem, 90vw)',
+          }}
+          className="h-fit"
+        >
+          <Input
+            classNames={{
+              base: 'max-w-full h-13',
+              mainWrapper: 'h-full',
+              input: 'text-md',
+              inputWrapper: 'h-full font-normal text-default-500 pr-2 shadow-lg border-2 border-black',
+            }}
+            placeholder="输入内容搜索..."
+            size="lg"
+            variant="bordered"
+            startContent={
+              <motion.div layoutId="search-icon">
+                <SearchIcon size={18} />
+              </motion.div>
+            }
+            type="search"
+            radius="full"
+            value={search}
+            onValueChange={setSearch}
+            onKeyDown={handleKeyDown}
+            endContent={
+              <motion.div
+                initial={{ opacity: 0, filter: 'blur(5px)' }}
+                animate={{
+                  opacity: buttonTransitionStatus.opacity,
+                  filter: buttonTransitionStatus.filter,
+                }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Button
+                  className="bg-gradient-to-br from-gray-500 to-gray-950 font-bold text-white shadow-lg"
+                  size="md"
+                  radius="full"
+                  onPress={handleSearch}
+                  isDisabled={buttonIsDisabled}
+                >
+                  搜索
+                </Button>
+              </motion.div>
+            }
+          />
+        </motion.div>
+      </div>
+
+
       {/* 搜索结果网格 */}
       {!loading && paginationRes[curPage - 1]?.length > 0 && (
         <div className="flex flex-col items-center gap-10">
-          <div className="grid grid-cols-2 gap-[4vw] sm:grid-cols-3 md:gap-[2vw] xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {paginationRes[curPage - 1]?.map((item: VideoItem, index: number) => (
-              <Card
+              <NavLink
                 key={`${item.source_code}_${item.vod_id}_${index}`}
-                isPressable
-                isFooterBlurred
-                onPress={() => navigate(`/detail/${item.source_code}/${item.vod_id}`)}
-                className="flex h-[27vh] w-full items-center border-none transition-transform hover:scale-103 lg:h-[35vh]"
-                radius="lg"
+                to={`/detail/${item.source_code}/${item.vod_id}`}
+                className="block"
               >
-                <CardHeader className="absolute top-1 z-10 flex-col items-start p-3">
-                  <div className="rounded-large bg-black/20 px-2 py-1 backdrop-blur">
-                    <p className="text-tiny font-bold text-white/80 uppercase">
-                      {item.source_name}
-                    </p>
-                  </div>
-                  {item.vod_remarks && (
-                    <Chip
-                      size="sm"
-                      color="warning"
-                      variant="flat"
-                      className="bg-warning/80 mt-2 backdrop-blur"
-                    >
-                      {item.vod_remarks}
-                    </Chip>
-                  )}
-                </CardHeader>
-                <Image
-                  removeWrapper
-                  isZoomed
-                  isBlurred
-                  loading="lazy"
-                  alt={item.vod_name}
-                  className="z-0 h-full w-full object-cover"
-                  src={
-                    item.vod_pic ||
-                    'https://placehold.jp/30/ffffff/000000/300x450.png?text=暂无封面'
-                  }
-                />
-                <CardFooter className="rounded-large shadow-small absolute bottom-[3%] z-10 min-h-[8vh] w-[92%] justify-between overflow-hidden border-1 border-white/20 py-2 backdrop-blur before:rounded-xl before:bg-white/10">
-                  <div className="flex flex-grow flex-col gap-1 px-1">
-                    <p className="text-tiny text-white/80">
-                      {item.type_name} · {item.vod_year}
-                    </p>
-                    <p className="line-clamp-2 text-sm font-semibold text-white">{item.vod_name}</p>
-                  </div>
-                </CardFooter>
-              </Card>
+                <Card
+                  isPressable
+                  isFooterBlurred
+                  className="flex w-full items-center border-none transition-transform hover:scale-103 aspect-[2/3]"
+                  radius="lg"
+                >
+                  <CardHeader className="absolute top-1 z-10 flex-col items-start p-3">
+                    <div className="rounded-large bg-black/20 px-2 py-1 backdrop-blur">
+                      <p className="text-tiny font-bold text-white/80 uppercase">
+                        {item.source_name}
+                      </p>
+                    </div>
+                    {item.vod_remarks && (
+                      <Chip
+                        size="sm"
+                        color="warning"
+                        variant="flat"
+                        className="bg-warning/80 mt-2 backdrop-blur"
+                      >
+                        {item.vod_remarks}
+                      </Chip>
+                    )}
+                  </CardHeader>
+                  <Image
+                    removeWrapper
+                    isZoomed
+                    isBlurred
+                    loading="lazy"
+                    alt={item.vod_name}
+                    className="z-0 h-full w-full object-cover"
+                    src={
+                      item.vod_pic ||
+                      'https://placehold.jp/30/ffffff/000000/300x450.png?text=暂无封面'
+                    }
+                  />
+                  <CardFooter className="rounded-large shadow-small absolute bottom-[3%] z-10 min-h-[8vh] w-[92%] justify-between overflow-hidden border-1 border-white/20 py-2 backdrop-blur before:rounded-xl before:bg-white/10">
+                    <div className="flex flex-grow flex-col gap-1 px-1">
+                      <p className="text-tiny text-white/80">
+                        {item.type_name} · {item.vod_year}
+                      </p>
+                      <p className="line-clamp-2 text-sm font-semibold text-white">{item.vod_name}</p>
+                    </div>
+                  </CardFooter>
+                </Card>
+              </NavLink>
             ))}
           </div>
           <div className="sticky bottom-[2vh] z-50 flex justify-center transition-all">
@@ -331,13 +467,13 @@ export default function SearchResult() {
 
       {/* 加载中 */}
       {loading && (
-        <div className="grid grid-cols-2 gap-[4vw] sm:grid-cols-3 md:gap-[2vw] xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {new Array(PaginationConfig.singlePageSize).fill(null).map((_, index: number) => (
             <Card
               key={index}
               isPressable
               isFooterBlurred
-              className="flex h-[27vh] w-full items-center border-none transition-transform hover:scale-103 lg:h-[35vh]"
+              className="flex w-full items-center border-none transition-transform hover:scale-103 aspect-[2/3]"
               radius="lg"
             >
               <Skeleton className="mt-[5%] h-[59%] w-[90%] rounded-lg md:h-[66%]" />

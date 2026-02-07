@@ -1,91 +1,65 @@
 import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
+import { persist } from 'zustand/middleware'
 
 interface AuthState {
-  sessionToken: string | null
-  salt: string | null
-  isInitialized: boolean
-}
-
-interface AuthActions {
-  login: (password: string) => Promise<boolean>
+  isAuthenticated: boolean
+  username: string | null
+  login: (username: string, password: string) => Promise<boolean>
   logout: () => void
   validateSession: () => Promise<boolean>
 }
 
-type AuthStore = AuthState & AuthActions
-
-// Helper to generate a random salt
-const generateSalt = () => {
-  const array = new Uint8Array(16)
-  window.crypto.getRandomValues(array)
-  return Array.from(array)
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('')
-}
-
-// Helper to compute SHA-256 hash
-const computeHash = async (message: string) => {
-  const msgBuffer = new TextEncoder().encode(message)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
-export const useAuthStore = create<AuthStore>()(
+export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
-      sessionToken: null,
-      salt: null,
-      isInitialized: false,
+    set => ({
+      isAuthenticated: false,
+      username: null,
 
-      login: async (password: string) => {
-        const correctPassword = import.meta.env.VITE_ACCESS_PASSWORD
-        // If no password configured, always allow
-        if (!correctPassword) {
+      login: async (username: string, password: string) => {
+        const configUsername = import.meta.env.VITE_USERNAME
+        const configPassword = import.meta.env.VITE_ACCESS_PASSWORD
+
+        if (!configUsername || !configPassword) {
+          console.error('[Auth] 用户名或密码未配置')
+          return false
+        }
+
+        if (username === configUsername && password === configPassword) {
+          set({ isAuthenticated: true, username })
+          console.log('[Auth] 登录成功:', username)
           return true
         }
 
-        if (password === correctPassword) {
-          const salt = generateSalt()
-          const token = await computeHash(correctPassword + salt)
-          set({ sessionToken: token, salt, isInitialized: true })
-          return true
-        }
+        console.error('[Auth] 登录失败: 用户名或密码错误')
         return false
       },
 
-      logout: () => set({ sessionToken: null, salt: null, isInitialized: true }),
+      logout: () => {
+        set({ isAuthenticated: false, username: null })
+        console.log('[Auth] 已登出')
+      },
 
       validateSession: async () => {
-        const { sessionToken, salt } = get()
-        const correctPassword = import.meta.env.VITE_ACCESS_PASSWORD
+        const configUsername = import.meta.env.VITE_USERNAME
+        const configPassword = import.meta.env.VITE_ACCESS_PASSWORD
 
-        // If no password configured, always valid
-        if (!correctPassword) {
-          return true
-        }
-
-        // If no token or salt, invalid
-        if (!sessionToken || !salt) {
+        if (!configUsername || !configPassword) {
+          console.error('[Auth] 用户名或密码未配置')
           return false
         }
 
-        // Re-compute hash to verify
-        const expectedToken = await computeHash(correctPassword + salt)
-        if (sessionToken === expectedToken) {
+        const state = useAuthStore.getState()
+        if (state.isAuthenticated && state.username === configUsername) {
+          console.log('[Auth] 会话有效')
           return true
-        } else {
-          // Invalid token (tampered or changed password), clear it
-          set({ sessionToken: null, salt: null })
-          return false
         }
+
+        console.log('[Auth] 会话无效')
+        return false
       },
     }),
     {
-      name: 'auth-storage',
-      storage: createJSONStorage(() => sessionStorage),
-      partialize: state => ({ sessionToken: state.sessionToken, salt: state.salt }),
-    },
-  ),
+      name: 'ouonnki-tv-auth',
+    }
+  )
 )

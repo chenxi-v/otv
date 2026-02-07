@@ -11,6 +11,7 @@ import {
   Loader2,
   Activity,
   Clock,
+  User,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -27,6 +28,8 @@ export default function DatabaseStatus() {
   const [lastCheckedAt, setLastCheckedAt] = useState<number | null>(null)
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
+  const [username, setUsername] = useState<string>('')
+  const [userId, setUserId] = useState<string>('')
 
   useEffect(() => {
     setIsConfigured(isUpstashConfigured())
@@ -50,6 +53,8 @@ export default function DatabaseStatus() {
     setIsEnabled(status.isEnabled)
     setIsConnected(status.isConnected)
     setLastSyncedAt(Date.now())
+    setUsername(import.meta.env.VITE_USERNAME || '')
+    setUserId(status.userId)
   }
 
   const startMonitoring = () => {
@@ -191,6 +196,28 @@ export default function DatabaseStatus() {
 
           {/* 详细状态信息 */}
           <div className="grid gap-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+            {username && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <User className="h-4 w-4" />
+                  <span>用户名</span>
+                </div>
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                  {username}
+                </span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <Database className="h-4 w-4" />
+                <span>用户 ID</span>
+              </div>
+              <span className="text-xs font-mono text-gray-600 dark:text-gray-400">
+                {userId}
+              </span>
+            </div>
+
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                 <Activity className="h-4 w-4" />

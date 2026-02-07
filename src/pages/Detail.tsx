@@ -6,7 +6,7 @@ import { useApiStore } from '@/store/apiStore'
 import { useSettingStore } from '@/store/settingStore'
 import { Chip, Button, Spinner, Tooltip, Divider, Select, SelectItem } from '@heroui/react'
 import { useDocumentTitle } from '@/hooks'
-import { ArrowUpIcon, ArrowDownIcon } from '@/components/icons'
+import { ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon } from '@/components/icons'
 import { motion } from 'framer-motion'
 
 export default function Detail() {
@@ -212,6 +212,15 @@ export default function Detail() {
 
   return (
     <div className="container mx-auto overflow-x-hidden p-4 pb-15 md:pt-10">
+      <div className="flex justify-end mb-4">
+        <Button
+          variant="ghost"
+          onClick={() => navigate(-1)}
+        >
+          返回
+          <ArrowLeftIcon className="h-4 w-4 ml-2" />
+        </Button>
+      </div>
       {/* 视频信息卡片 */}
 
       <motion.div

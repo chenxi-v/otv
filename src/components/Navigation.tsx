@@ -1,5 +1,5 @@
 import { Navbar, NavbarBrand, NavbarContent, Input } from '@heroui/react'
-import { OkiLogo, SearchIcon } from '@/components/icons'
+import { OkiLogo, SearchIcon, FilmIcon } from '@/components/icons'
 import { NavLink } from 'react-router'
 import { useSearch } from '@/hooks'
 import { motion } from 'framer-motion'
@@ -125,6 +125,14 @@ export default function Navigation() {
                 </Card>
               </div>
             )}
+          </motion.div>
+          <motion.div
+            layoutId="history-icon"
+            className="flex items-center rounded-full p-2 transition-all duration-300 hover:cursor-pointer hover:bg-gray-200 active:bg-gray-200"
+          >
+            <NavLink to="/douban">
+              <FilmIcon className="h-5 w-5" />
+            </NavLink>
           </motion.div>
           <motion.div
             layoutId="history-icon"
