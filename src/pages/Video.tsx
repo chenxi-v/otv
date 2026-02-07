@@ -254,7 +254,6 @@ export default function Video() {
       mutex: true,
       backdrop: true,
       playsInline: true,
-      autoOrientation: true,
       // autoPlayback: true, // Removed to avoid duplicate resume logic with viewingHistoryStore
       airplay: true,
       theme: '#23ade5',
